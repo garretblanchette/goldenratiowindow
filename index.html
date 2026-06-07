@@ -126,7 +126,7 @@ document.getElementById('start').onclick=initCam;
 async function loadModel(){
   if(model)return model;
   sub.textContent='loading detector…';
-  model=await cocoSsd.load({base:'lite_mobilenet_v2'});
+  model=await cocoSsd.load({base:'mobilenet_v2'});
   return model;
 }
 
@@ -179,9 +179,9 @@ function evaluate(preds){
     else if(CATLIKE.has(p.class)){ if(!bestLike||p.score>bestLike.score)bestLike=p; }
   }
   let v;
-  if(bestCat && bestCat.score>=0.62){
+  if(bestCat && bestCat.score>=0.50){
     v={state:'yes',label:'CAT',score:bestCat.score,bbox:bestCat.bbox};
-  }else if(bestCat && bestCat.score>=0.30){
+  }else if(bestCat && bestCat.score>=0.20){
     v={state:'maybe',label:'kinda looks like a cat',score:bestCat.score,bbox:bestCat.bbox};
   }else if(bestLike && bestLike.score>=0.55){
     v={state:'maybe',label:'more like a '+bestLike.class,score:bestLike.score,bbox:bestLike.bbox};
