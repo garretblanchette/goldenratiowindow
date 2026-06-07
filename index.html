@@ -158,25 +158,70 @@ function sizeStage(){
 }
 window.addEventListener('resize',()=>{if(running)sizeStage();});
 
+// offscreen canvases for tiled detection
+const feedCv=document.createElement('canvas');
+const fctx=feedCv.getContext('2d',{willReadFrequently:true});
+const workCv=document.createElement('canvas');
+const wctx=workCv.getContext('2d',{willReadFrequently:true});
+
+// rotating crop regions [x,y,w,h] as fractions of the frame.
+// each cycle scans the full frame PLUS one of these, so small/off-center
+// subjects fill more of the detector's fixed input over a ~1s sweep.
+const CROPS=[
+  [0.20,0.20,0.60,0.60], // center
+  [0.00,0.00,0.58,0.58], // top-left
+  [0.42,0.00,0.58,0.58], // top-right
+  [0.00,0.42,0.58,0.58], // bottom-left
+  [0.42,0.42,0.58,0.58], // bottom-right
+];
+let cropIdx=0;
+let hits=[]; // recent detections pooled across regions: {class,score,bbox,t}
+const MEM=1500; // ms to remember a detection
+
+async function detectRegion(sx,sy,sw,sh){
+  sx=Math.round(sx);sy=Math.round(sy);
+  sw=Math.max(8,Math.round(sw));sh=Math.max(8,Math.round(sh));
+  workCv.width=sw;workCv.height=sh;
+  wctx.drawImage(feedCv,sx,sy,sw,sh,0,0,sw,sh);
+  const preds=await model.detect(workCv,20);
+  return preds.map(p=>({class:p.class,score:p.score,
+    bbox:[p.bbox[0]+sx,p.bbox[1]+sy,p.bbox[2],p.bbox[3]]}));
+}
+
 async function detectLoop(){
-  if(!running){return;}
+  if(!running)return;
   if(!frozen && model && video.readyState>=2 && !detecting){
     detecting=true;
     try{
-      const preds=await model.detect(video,20);
-      evaluate(preds);
+      feedCv.width=vw;feedCv.height=vh;
+      fctx.drawImage(video,0,0,vw,vh);
+      let preds=await model.detect(feedCv,20);            // whole frame
+      const c=CROPS[cropIdx];cropIdx=(cropIdx+1)%CROPS.length;
+      preds=preds.concat(await detectRegion(c[0]*vw,c[1]*vh,c[2]*vw,c[3]*vh)); // one tile
+      ingest(preds);
+      evaluate();
     }catch(e){/* ignore transient frame errors */}
     detecting=false;
   }
   draw();
-  setTimeout(detectLoop,180);
+  setTimeout(detectLoop,100);
 }
 
-function evaluate(preds){
-  let bestCat=null, bestLike=null;
+function ingest(preds){
+  const t=performance.now();
   for(const p of preds){
-    if(p.class==='cat'){ if(!bestCat||p.score>bestCat.score)bestCat=p; }
-    else if(CATLIKE.has(p.class)){ if(!bestLike||p.score>bestLike.score)bestLike=p; }
+    if(p.class==='cat'||CATLIKE.has(p.class)) hits.push({class:p.class,score:p.score,bbox:p.bbox,t});
+  }
+  hits=hits.filter(h=>t-h.t<MEM);
+}
+
+function evaluate(){
+  const t=performance.now();
+  hits=hits.filter(h=>t-h.t<MEM);
+  let bestCat=null, bestLike=null;
+  for(const h of hits){
+    if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; }
+    else if(!bestLike||h.score>bestLike.score)bestLike=h;
   }
   let v;
   if(bestCat && bestCat.score>=0.50){
@@ -186,7 +231,7 @@ function evaluate(preds){
   }else if(bestLike && bestLike.score>=0.55){
     v={state:'maybe',label:'more like a '+bestLike.class,score:bestLike.score,bbox:bestLike.bbox};
   }else{
-    v={state:'no',label:'NOT a cat',score:bestCat?bestCat.score:0,bbox:null};
+    v={state:'no',label:'NOT a cat',score:0,bbox:null};
   }
   lastVerdict=v;
   setBadge(v);
@@ -246,7 +291,7 @@ function saveShot(){
 }
 function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
 
-document.getElementById('freezeBtn').onclick=function(){frozen=!frozen;this.textContent=frozen?'Unfreeze':'Freeze';};
+document.getElementById('freezeBtn').onclick=function(){frozen=!frozen;if(frozen){video.pause();}else{video.play();}this.textContent=frozen?'Unfreeze':'Freeze';};
 document.getElementById('flipBtn').onclick=()=>{facing=facing==='environment'?'user':'environment';if(running)initCam();};
 document.getElementById('shotBtn').onclick=saveShot;
 </script>
