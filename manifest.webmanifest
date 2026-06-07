@@ -1,7 +1,7 @@
 {
-  "name": "φ-Lens · How golden is it?",
-  "short_name": "φ-Lens",
-  "description": "Point your camera at anything and measure how closely it follows the golden ratio.",
+  "name": "Is It a Cat?",
+  "short_name": "Cat?",
+  "description": "Point your camera at anything and find out if it's a cat.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
