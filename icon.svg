@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0c0a08"/>
+  <g fill="none" stroke="#f0c14b" stroke-width="14" stroke-linecap="round">
+    <path d="M256 256 m0 0
+             a1 1 0 0 1 0 0" />
+  </g>
+  <!-- golden spiral -->
+  <path d="M 330 196
+           C 330 240, 296 274, 252 274
+           C 200 274, 158 232, 158 180
+           C 158 118, 208 68, 270 68
+           C 344 68, 404 128, 404 202
+           C 404 290, 332 362, 244 362
+           C 142 362, 60 280, 60 178"
+        fill="none" stroke="#f0c14b" stroke-width="16" stroke-linecap="round"/>
+  <!-- phi glyph -->
+  <text x="256" y="468" font-family="Georgia, serif" font-style="italic" font-weight="700"
+        font-size="120" fill="#d4a13a" text-anchor="middle">φ</text>
+</svg>

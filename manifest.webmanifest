@@ -1,0 +1,13 @@
+{
+  "name": "φ-Lens · How golden is it?",
+  "short_name": "φ-Lens",
+  "description": "Point your camera at anything and measure how closely it follows the golden ratio.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0a08",
+  "theme_color": "#0c0a08",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>φ-Lens · How golden is it?</title>
+<meta name="description" content="Point your camera at anything and find out how closely it follows the golden ratio. Sunflowers score 90+. What does your face score?">
+<meta property="og:title" content="φ-Lens · How golden is it?">
+<meta property="og:description" content="Point your camera at anything and find out how golden-ratio it is. Sunflowers hit 90+. What about you?">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://phi-lens.vercel.app">
+<meta property="og:image" content="https://phi-lens.vercel.app/card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="φ-Lens · How golden is it?">
+<meta name="twitter:description" content="Point your camera at anything and find out how golden-ratio it is.">
+<meta name="twitter:image" content="https://phi-lens.vercel.app/card.png">
+<meta name="theme-color" content="#0c0a08">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
+  :root{
+    --phi:1.6180339887;--bg:#0c0a08;--panel:#16130f;--line:#2a2419;
+    --gold:#d4a13a;--gold-bright:#f0c14b;--ink:#ece4d4;--dim:#8a8170;
+    --green:#5fb47a;--red:#c5604f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);color:var(--ink);font-family:'Spline Sans Mono',monospace;
+    display:flex;flex-direction:column;
+    background-image:radial-gradient(circle at 30% 0%,#1a1610 0%,transparent 55%);
+  }
+
+  /* ---- capture frame: this is what gets screenshotted ---- */
+  #capture{
+    position:relative;flex:1;display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+  }
+  #stageWrap{position:relative;max-width:100%;max-height:100%}
+  #view{position:relative;display:block;border-radius:8px;overflow:hidden;background:#000}
+  video{display:block;max-width:100%;max-height:78vh}
+  canvas#feed{display:none}
+  canvas#heat{position:absolute;top:0;left:0;pointer-events:none;mix-blend-mode:screen}
+
+  /* big score badge, always in frame for screenshots */
+  #badge{
+    position:absolute;top:14px;left:14px;z-index:5;
+    background:rgba(12,10,8,.72);backdrop-filter:blur(8px);
+    border:1px solid var(--line);border-radius:14px;padding:12px 18px;
+    display:flex;align-items:baseline;gap:10px;
+  }
+  #badgeNum{font-family:'Fraunces',serif;font-weight:900;font-size:46px;line-height:.9;color:var(--gold-bright)}
+  #badgeNum small{font-size:18px;color:var(--dim)}
+  #badgeTxt{display:flex;flex-direction:column;gap:2px}
+  #badgeVerdict{font-size:12px;color:var(--dim)}
+  #badgeLabel{font-family:'Fraunces',serif;font-style:italic;font-size:14px;color:var(--gold)}
+  #wm{position:absolute;bottom:12px;right:14px;z-index:5;font-size:11px;color:rgba(236,228,212,.55);letter-spacing:.04em}
+  #wm b{color:var(--gold-bright)}
+
+  /* lens ring follows pointer/touch */
+  #ring{position:absolute;border-radius:50%;border:3px solid var(--gold);
+    box-shadow:0 0 0 2px #000,0 0 26px rgba(212,161,58,.45),inset 0 0 22px rgba(0,0,0,.5);
+    pointer-events:none;display:none;z-index:6}
+  #ring canvas{border-radius:50%;display:block}
+
+  /* ---- controls below the capture frame (not screenshotted) ---- */
+  #bar{
+    flex:none;padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line);background:var(--panel);
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .title{display:flex;align-items:baseline;gap:10px;justify-content:center}
+  .title h1{font-family:'Fraunces',serif;font-weight:900;font-size:22px;color:var(--gold-bright)}
+  .title h1 .phi{font-style:italic}
+  .title span{font-size:11px;color:var(--dim)}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  button{
+    background:#1f1a12;border:1px solid var(--line);color:var(--ink);
+    font-family:'Spline Sans Mono',monospace;font-size:13px;font-weight:500;
+    padding:12px 16px;border-radius:8px;cursor:pointer;transition:.12s;flex:1;min-width:120px;
+  }
+  button:hover{border-color:var(--gold)}
+  button.primary{background:var(--gold);color:#0c0a08;border-color:var(--gold);font-weight:600}
+  button.primary:hover{background:var(--gold-bright)}
+  button.on{background:var(--gold);color:#0c0a08;border-color:var(--gold)}
+  .sliders{display:flex;gap:16px;align-items:center}
+  .sliders label{font-size:11px;color:var(--dim);flex:1;display:flex;flex-direction:column;gap:4px}
+  input[type=range]{width:100%;accent-color:var(--gold)}
+  #hint{text-align:center;font-size:12px;color:var(--dim);line-height:1.5;padding:0 8px}
+  #err{text-align:center;font-size:12px;color:var(--red);line-height:1.5}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="capture">
+  <div id="stageWrap">
+    <div id="view">
+      <video id="video" playsinline muted></video>
+      <canvas id="feed"></canvas>
+      <canvas id="heat"></canvas>
+      <div id="ring"><canvas id="lens"></canvas></div>
+    </div>
+    <div id="badge">
+      <div id="badgeNum">—<small>%</small></div>
+      <div id="badgeTxt"><span id="badgeLabel">φ-Lens</span><span id="badgeVerdict">tap start</span></div>
+    </div>
+    <div id="wm"><b>φ</b>-lens.vercel.app</div>
+  </div>
+</div>
+
+<div id="bar">
+  <div class="title"><h1><span class="phi">φ</span>-Lens</h1><span>how golden is it?</span></div>
+  <div class="btns" id="preBtns">
+    <button class="primary" id="start">Start camera</button>
+  </div>
+  <div class="btns hidden" id="liveBtns">
+    <button id="scanBtn">Auto-scan ✦</button>
+    <button id="freezeBtn">Freeze</button>
+    <button id="flipBtn">Flip cam</button>
+    <button id="shotBtn" class="primary">📸 Save shot</button>
+  </div>
+  <div class="sliders hidden" id="sliders">
+    <label>Lens size <input type="range" id="size" min="100" max="320" value="190"></label>
+    <label>Zoom <input type="range" id="zoom" min="10" max="40" value="20"></label>
+  </div>
+  <div id="hint">Point the camera at a sunflower, pinecone, shell, succulent, or a face. Drag to move the lens. Hit Auto-scan to heat-map the most golden zones, then Save shot.</div>
+  <div id="err"></div>
+</div>
+
+<script>
+const PHI=1.6180339887;
+const video=document.getElementById('video');
+const feed=document.getElementById('feed');
+const fctx=feed.getContext('2d',{willReadFrequently:true});
+const heat=document.getElementById('heat');
+const hctx=heat.getContext('2d');
+const ring=document.getElementById('ring');
+const lens=document.getElementById('lens');
+const lctx=lens.getContext('2d');
+const view=document.getElementById('view');
+
+let lensSize=190,zoom=2.0,facing='environment',stream=null;
+let frozen=false,scanning=false,running=false;
+let vw=0,vh=0,dispW=0,dispH=0;
+let pt={x:-1,y:-1,active:false};
+let peak=0;
+
+document.getElementById('start').onclick=initCam;
+
+async function initCam(){
+  document.getElementById('err').textContent='';
+  try{
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:facing,width:{ideal:1280},height:{ideal:720}},audio:false});
+    video.srcObject=stream;await video.play();
+    vw=video.videoWidth;vh=video.videoHeight;
+    feed.width=vw;feed.height=vh;
+    sizeStage();
+    document.getElementById('preBtns').classList.add('hidden');
+    document.getElementById('liveBtns').classList.remove('hidden');
+    document.getElementById('sliders').classList.remove('hidden');
+    document.getElementById('badgeVerdict').textContent='drag the lens';
+    // place lens in center to start
+    pt.x=dispW/2;pt.y=dispH/2;pt.active=true;
+    running=true;loop();
+  }catch(e){
+    document.getElementById('err').textContent='Camera unavailable: '+e.name+'. If this is a preview pane, open in a full browser tab. Camera needs HTTPS + permission.';
+  }
+}
+
+function sizeStage(){
+  const r=video.getBoundingClientRect();
+  dispW=r.width;dispH=r.height;
+  heat.width=vw;heat.height=vh;
+  heat.style.width=dispW+'px';heat.style.height=dispH+'px';
+}
+window.addEventListener('resize',()=>{if(running)sizeStage();});
+
+function loop(){
+  if(!running)return;
+  if(!frozen && video.readyState>=2)fctx.drawImage(video,0,0,vw,vh);
+  if(pt.active){renderLens();const s=scoreAt(feedXY(pt.x,pt.y),true);if(s)setBadge(s);}
+  requestAnimationFrame(loop);
+}
+
+function feedXY(dx,dy){return {x:dx/dispW*vw, y:dy/dispH*vh};}
+
+function renderLens(){
+  ring.style.display='block';
+  ring.style.width=ring.style.height=lensSize+'px';
+  ring.style.left=(pt.x-lensSize/2)+'px';
+  ring.style.top=(pt.y-lensSize/2)+'px';
+  lens.width=lens.height=lensSize;
+  const f=feedXY(pt.x,pt.y);
+  const src=lensSize/zoom*(vw/dispW);
+  lctx.clearRect(0,0,lensSize,lensSize);
+  lctx.save();lctx.beginPath();lctx.arc(lensSize/2,lensSize/2,lensSize/2,0,7);lctx.clip();
+  lctx.imageSmoothingEnabled=false;
+  lctx.drawImage(feed,f.x-src/2,f.y-src/2,src,src,0,0,lensSize,lensSize);
+  // overlay
+  lctx.strokeStyle='rgba(240,193,75,.5)';lctx.lineWidth=1.5;
+  let a=0,r=1;const c=lensSize/2;lctx.beginPath();
+  for(let t=0;t<400;t++){a+=0.1;r=1.4*Math.pow(PHI,a/(Math.PI/2));if(r>lensSize/2)break;
+    const x=c+r*Math.cos(a),y=c+r*Math.sin(a);t?lctx.lineTo(x,y):lctx.moveTo(x,y);}
+  lctx.stroke();lctx.restore();
+}
+
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+// score a square region centered at feed-coords {x,y}; returns {m1,m2,m3,total}
+function scoreAt(center,useLensSize){
+  const reg = useLensSize ? lensSize/zoom*(vw/dispW) : Math.min(vw,vh)/6;
+  const sx=clamp(center.x-reg/2,0,vw-reg), sy=clamp(center.y-reg/2,0,vh-reg);
+  let img;try{img=fctx.getImageData(sx,sy,reg,reg);}catch(e){return null;}
+  const S=48,W=Math.floor(reg);
+  const g=new Float32Array(S*S);
+  for(let yy=0;yy<S;yy++)for(let xx=0;xx<S;xx++){
+    const px=Math.floor(xx/S*W),py=Math.floor(yy/S*W);
+    const idx=(py*W+px)*4;
+    g[yy*S+xx]=(img.data[idx]*0.299+img.data[idx+1]*0.587+img.data[idx+2]*0.114)/255;
+  }
+  const e=new Float32Array(S*S);
+  for(let y=1;y<S-1;y++)for(let x=1;x<S-1;x++){
+    const gx=g[(y-1)*S+x+1]+2*g[y*S+x+1]+g[(y+1)*S+x+1]-g[(y-1)*S+x-1]-2*g[y*S+x-1]-g[(y+1)*S+x-1];
+    const gy=g[(y+1)*S+x-1]+2*g[(y+1)*S+x]+g[(y+1)*S+x+1]-g[(y-1)*S+x-1]-2*g[(y-1)*S+x]-g[(y-1)*S+x+1];
+    e[y*S+x]=Math.hypot(gx,gy);
+  }
+  const cx=S/2,cy=S/2;
+  const spiral=(gr)=>{let s=0,n=0,a=0,r=1;
+    for(let t=0;t<220;t++){a+=0.13;r=Math.pow(gr,a/(Math.PI/2));if(r>S/2)break;
+      const x=Math.round(cx+r*Math.cos(a)),y=Math.round(cy+r*Math.sin(a));
+      if(x>0&&x<S-1&&y>0&&y<S-1){s+=e[y*S+x];n++;}}return n?s/n:0;};
+  const gold=spiral(PHI),ctrl=(spiral(1.3)+spiral(2.1)+spiral(1.9))/3;
+  let m1=ctrl>0?gold/(gold+ctrl):0.5;m1=clamp((m1-0.45)/0.25,0,1);
+  const colE=new Float32Array(S),rowE=new Float32Array(S);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){colE[x]+=e[y*S+x];rowE[y]+=e[y*S+x];}
+  const lines=[S/PHI,S-S/PHI,S/PHI/PHI,S-S/PHI/PHI];
+  const fit=(arr)=>{const mx=Math.max(...arr)||1;let near=0,tot=0;
+    for(let i=0;i<S;i++){const w=arr[i]/mx;tot+=w;const d=Math.min(...lines.map(l=>Math.abs(i-l)));if(d<S*0.05)near+=w;}return tot>0?near/tot:0;};
+  let m2=clamp(((fit(colE)+fit(rowE))/2-0.10)/0.22,0,1);
+  const RB=20,rad=new Float32Array(RB),rn=new Float32Array(RB);
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const r=Math.hypot(x-cx,y-cy)/(S/2);if(r>1)continue;const b=Math.min(RB-1,Math.floor(r*RB));rad[b]+=e[y*S+x];rn[b]++;}
+  for(let i=0;i<RB;i++)rad[i]=rn[i]?rad[i]/rn[i]:0;
+  let dm=0,dn=0;for(let i=1;i<RB;i++)if(rad[i]>0.01&&rad[i-1]>0.01){dm+=Math.log(rad[i]/rad[i-1]);dn++;}
+  dm=dn?dm/dn:0;let dv=0;for(let i=1;i<RB;i++)if(rad[i]>0.01&&rad[i-1]>0.01)dv+=(Math.log(rad[i]/rad[i-1])-dm)**2;
+  dv=dn?Math.sqrt(dv/dn):2;let m3=clamp(1-dv/1.2,0,1);
+  return {m1,m2,m3,total:Math.round((m1+m2+m3)/3*100)};
+}
+
+function setBadge(s){
+  const n=document.getElementById('badgeNum');
+  n.innerHTML=s.total+'<small>%</small>';
+  const v=document.getElementById('badgeVerdict');let txt,col;
+  if(s.total>=72){txt='strong φ structure';col='var(--green)';}
+  else if(s.total>=45){txt='partial φ';col='var(--gold-bright)';}
+  else{txt='no φ structure';col='var(--red)';}
+  v.textContent=txt;n.style.color=col;
+  if(s.total>peak)peak=s.total;
+}
+
+// ---- auto-scan: grid over whole frame, heat-map golden zones ----
+async function autoScan(){
+  if(!running||scanning)return;
+  scanning=true;
+  document.getElementById('scanBtn').classList.add('on');
+  document.getElementById('badgeVerdict').textContent='scanning…';
+  const wasFrozen=frozen;frozen=true; // lock frame during scan
+  fctx.drawImage(video,0,0,vw,vh);
+  hctx.clearRect(0,0,vw,vh);
+  const cols=16,rows=Math.round(cols*vh/vw);
+  const cw=vw/cols, ch=vh/rows;
+  let best={total:-1,x:0,y:0};
+  for(let gy=0;gy<rows;gy++){
+    for(let gx=0;gx<cols;gx++){
+      const cxp=gx*cw+cw/2, cyp=gy*ch+ch/2;
+      const s=scoreAt({x:cxp,y:cyp},false);
+      if(!s)continue;
+      if(s.total>best.total)best={total:s.total,x:cxp,y:cyp};
+      // heat color: red->gold->green by score
+      const t=s.total/100;
+      const alpha=Math.pow(t,1.5)*0.62;
+      let col;
+      if(t<0.45)col=`rgba(197,96,79,${alpha})`;
+      else if(t<0.72)col=`rgba(240,193,75,${alpha})`;
+      else col=`rgba(95,180,122,${alpha})`;
+      hctx.fillStyle=col;
+      hctx.fillRect(gx*cw,gy*ch,cw+1,ch+1);
+    }
+    await new Promise(r=>setTimeout(r,8)); // yield so UI paints progressively
+  }
+  // mark the hottest spot
+  hctx.strokeStyle='#f0c14b';hctx.lineWidth=4;
+  hctx.beginPath();hctx.arc(best.x,best.y,Math.min(vw,vh)/10,0,7);hctx.stroke();
+  // move lens to best and score it at lens resolution
+  pt.x=best.x/vw*dispW;pt.y=best.y/vh*dispH;pt.active=true;
+  const fs=scoreAt({x:best.x,y:best.y},true);if(fs)setBadge(fs);
+  document.getElementById('badgeVerdict').textContent='hottest zone found';
+  frozen=wasFrozen;
+  scanning=false;
+  document.getElementById('scanBtn').classList.remove('on');
+}
+
+// ---- screenshot: composite feed + heat + badge into one downloadable PNG ----
+function saveShot(){
+  const out=document.createElement('canvas');
+  out.width=vw;out.height=vh;const o=out.getContext('2d');
+  o.drawImage(feed,0,0);
+  o.drawImage(heat,0,0,vw,vh);
+  // badge
+  const s=vw/700; o.save();
+  o.fillStyle='rgba(12,10,8,.72)';
+  roundRect(o,20*s,20*s,260*s,90*s,16*s);o.fill();
+  o.fillStyle='#f0c14b';o.font=`900 ${64*s}px Fraunces, serif`;
+  o.fillText(document.getElementById('badgeNum').textContent, 34*s, 86*s);
+  o.fillStyle='#d4a13a';o.font=`italic ${22*s}px Fraunces, serif`;
+  o.fillText(document.getElementById('badgeVerdict').textContent, 36*s, 108*s);
+  // watermark
+  o.fillStyle='rgba(236,228,212,.7)';o.font=`${20*s}px monospace`;
+  o.textAlign='right';o.fillText('phi-lens.vercel.app', vw-24*s, vh-24*s);
+  o.restore();
+  out.toBlob(b=>{
+    const url=URL.createObjectURL(b);
+    const a=document.createElement('a');a.href=url;a.download='phi-lens-'+document.getElementById('badgeNum').textContent.replace('%','')+'pct.png';
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  },'image/png');
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+
+// ---- pointer + touch ----
+function setPt(clientX,clientY){
+  const r=video.getBoundingClientRect();
+  pt.x=clamp(clientX-r.left,0,r.width);
+  pt.y=clamp(clientY-r.top,0,r.height);
+  pt.active=true;
+  hctx.clearRect(0,0,vw,vh); // clear heat when manually moving
+}
+view.addEventListener('mousemove',e=>{if(running)setPt(e.clientX,e.clientY);});
+view.addEventListener('touchstart',e=>{if(running){e.preventDefault();const t=e.touches[0];setPt(t.clientX,t.clientY);}},{passive:false});
+view.addEventListener('touchmove',e=>{if(running){e.preventDefault();const t=e.touches[0];setPt(t.clientX,t.clientY);}},{passive:false});
+
+document.getElementById('scanBtn').onclick=autoScan;
+document.getElementById('freezeBtn').onclick=function(){frozen=!frozen;this.classList.toggle('on',frozen);this.textContent=frozen?'Unfreeze':'Freeze';};
+document.getElementById('flipBtn').onclick=()=>{facing=facing==='environment'?'user':'environment';if(running)initCam();};
+document.getElementById('shotBtn').onclick=saveShot;
+document.getElementById('size').oninput=e=>lensSize=+e.target.value;
+document.getElementById('zoom').oninput=e=>zoom=+e.target.value/10;
+</script>
+</body>
+</html>
