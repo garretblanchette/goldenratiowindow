@@ -218,14 +218,19 @@ function ingest(preds){
 function evaluate(){
   const t=performance.now();
   hits=hits.filter(h=>t-h.t<MEM);
-  let bestCat=null, bestLike=null;
+  let bestCat=null, bestDog=null, bestLike=null;
   for(const h of hits){
     if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; }
+    else if(h.class==='dog'){ if(!bestDog||h.score>bestDog.score)bestDog=h; }
     else if(!bestLike||h.score>bestLike.score)bestLike=h;
   }
+  // a dog that scores as high as the cat means it's a dog, not a cat
+  const dogBeatsCat = bestDog && (!bestCat || bestDog.score>=bestCat.score);
   let v;
-  if(bestCat && bestCat.score>=0.50){
+  if(bestCat && bestCat.score>=0.50 && !dogBeatsCat){
     v={state:'yes',label:'CAT',score:bestCat.score,bbox:bestCat.bbox};
+  }else if(dogBeatsCat && bestDog.score>=0.40){
+    v={state:'no',label:"that's a dog",score:bestDog.score,bbox:bestDog.bbox};
   }else if(bestCat && bestCat.score>=0.20){
     v={state:'maybe',label:'kinda looks like a cat',score:bestCat.score,bbox:bestCat.bbox};
   }else if(bestLike && bestLike.score>=0.55){
@@ -241,7 +246,7 @@ function setBadge(v){
   let ic,txt,col,sb;
   if(v.state==='yes'){ic='✅';txt='Cat';col='var(--green-bright)';sb='yep, that is a cat  ·  '+Math.round(v.score*100)+'%';}
   else if(v.state==='maybe'){ic='❓';txt='Maybe?';col='var(--amber)';sb=v.label+'  ·  '+Math.round(v.score*100)+'%';}
-  else{ic='❌';txt='Not a cat';col='var(--red-bright)';sb='no cat detected';}
+  else{ic='❌';txt='Not a cat';col='var(--red-bright)';sb=(v.label && v.label!=='NOT a cat')?v.label+'  ·  '+Math.round(v.score*100)+'%':'no cat detected';}
   icon.textContent=ic;
   verdict.textContent=txt;verdict.style.color=col;
   sub.textContent=sb;
