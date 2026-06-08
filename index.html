@@ -88,7 +88,11 @@
 </div>
 
 <div id="bar">
-  <div class="title"><h1>Is It a Cat?</h1><span>point &amp; find out</span></div>
+  <div class="title"><h1 id="appTitle">Is It a Cat?</h1><span>point &amp; find out</span></div>
+  <div class="btns" id="modes" style="gap:6px">
+    <button id="modeCat" class="primary" style="min-width:0">Is it a cat?</button>
+    <button id="modeHC" style="min-width:0">Human or cat?</button>
+  </div>
   <div class="btns" id="preBtns">
     <button class="primary" id="start">Start camera</button>
   </div>
@@ -97,7 +101,7 @@
     <button id="flipBtn">Flip cam</button>
     <button id="shotBtn" class="primary">📸 Save shot</button>
   </div>
-  <div id="hint">Point the camera at anything. Green check means cat, red X means no cat, and a ? means it kind of looks like one. First scan loads the detector, give it a few seconds.</div>
+  <div id="hint">Use the toggle to switch modes. "Is it a cat?" gives a green check / red X verdict. "Human or cat?" tells you which one it's looking at. First scan loads the detector, give it a few seconds.</div>
   <div id="err"></div>
 </div>
 
@@ -117,6 +121,7 @@ const sub=document.getElementById('badgeSub');
 const CATLIKE=new Set(['dog','teddy bear','bear','mouse','sheep','horse','cow']);
 
 let facing='environment',stream=null,model=null;
+let mode='cat'; // 'cat' or 'humancat'
 let frozen=false,running=false,detecting=false;
 let vw=0,vh=0,dispW=0,dispH=0;
 let lastVerdict={state:'none',label:'',score:0,bbox:null};
@@ -210,7 +215,7 @@ async function detectLoop(){
 function ingest(preds){
   const t=performance.now();
   for(const p of preds){
-    if(p.class==='cat'||CATLIKE.has(p.class)) hits.push({class:p.class,score:p.score,bbox:p.bbox,t});
+    if(p.class==='cat'||p.class==='person'||CATLIKE.has(p.class)) hits.push({class:p.class,score:p.score,bbox:p.bbox,t});
   }
   hits=hits.filter(h=>t-h.t<MEM);
 }
@@ -218,6 +223,7 @@ function ingest(preds){
 function evaluate(){
   const t=performance.now();
   hits=hits.filter(h=>t-h.t<MEM);
+  if(mode==='humancat'){evalHumanCat();return;}
   let bestCat=null, bestDog=null, bestLike=null, catStrong=0;
   for(const h of hits){
     if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; if(h.score>=0.50)catStrong++; }
@@ -245,9 +251,32 @@ function evaluate(){
   setBadge(v);
 }
 
+function evalHumanCat(){
+  let bestPerson=null,bestCat=null;
+  for(const h of hits){
+    if(h.class==='person'){ if(!bestPerson||h.score>bestPerson.score)bestPerson=h; }
+    else if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; }
+  }
+  const pOK=bestPerson&&bestPerson.score>=0.40;
+  const cOK=bestCat&&bestCat.score>=0.40;
+  let v;
+  if(pOK && (!cOK || bestPerson.score>=bestCat.score)){
+    v={state:'human',label:'Human',score:bestPerson.score,bbox:bestPerson.bbox};
+  }else if(cOK){
+    v={state:'catwin',label:'Cat',score:bestCat.score,bbox:bestCat.bbox};
+  }else{
+    v={state:'idle',label:'',score:0,bbox:null};
+  }
+  lastVerdict=v;
+  setBadge(v);
+}
+
 function setBadge(v){
   let ic,txt,col,sb;
-  if(v.state==='yes'){ic='✅';txt='Cat';col='var(--green-bright)';sb='yep, that is a cat  ·  '+Math.round(v.score*100)+'%';}
+  if(v.state==='human'){ic='🧑';txt='Human';col='#6fa8dc';sb='that is a person  ·  '+Math.round(v.score*100)+'%';}
+  else if(v.state==='catwin'){ic='🐱';txt='Cat';col='var(--green-bright)';sb='that is a cat  ·  '+Math.round(v.score*100)+'%';}
+  else if(v.state==='idle'){ic='❓';txt='—';col='var(--dim)';sb='point at a person or a cat';}
+  else if(v.state==='yes'){ic='✅';txt='Cat';col='var(--green-bright)';sb='yep, that is a cat  ·  '+Math.round(v.score*100)+'%';}
   else if(v.state==='maybe'){ic='❓';txt='Maybe?';col='var(--amber)';sb=v.label+'  ·  '+Math.round(v.score*100)+'%';}
   else{ic='❌';txt='Not a cat';col='var(--red-bright)';sb=(v.label && v.label!=='NOT a cat')?v.label+'  ·  '+Math.round(v.score*100)+'%':'no cat detected';}
   icon.textContent=ic;
@@ -261,7 +290,8 @@ function draw(){
   const b=lastVerdict.bbox;
   if(!b)return;
   let col;
-  if(lastVerdict.state==='yes')col='#7fe0a0';
+  if(lastVerdict.state==='yes'||lastVerdict.state==='catwin')col='#7fe0a0';
+  else if(lastVerdict.state==='human')col='#6fa8dc';
   else if(lastVerdict.state==='maybe')col='#e6b23c';
   else col='#e87a68';
   bctx.strokeStyle=col;bctx.lineWidth=Math.max(3,vw/220);
@@ -278,11 +308,15 @@ function saveShot(){
   o.fillStyle='rgba(12,10,8,.72)';
   roundRect(o,20*s,20*s,300*s,96*s,16*s);o.fill();
   o.font=`${52*s}px serif`;o.textAlign='left';o.textBaseline='middle';
-  const ic=lastVerdict.state==='yes'?'✅':lastVerdict.state==='maybe'?'❓':'❌';
+  const st=lastVerdict.state;
+  const ic=st==='yes'?'✅':st==='catwin'?'🐱':st==='human'?'🧑':st==='maybe'?'❓':st==='idle'?'❓':'❌';
   o.fillText(ic, 34*s, 68*s);
   let txt,col;
-  if(lastVerdict.state==='yes'){txt='Cat';col='#7fe0a0';}
-  else if(lastVerdict.state==='maybe'){txt='Maybe?';col='#e6b23c';}
+  if(st==='yes'){txt='Cat';col='#7fe0a0';}
+  else if(st==='catwin'){txt='Cat';col='#7fe0a0';}
+  else if(st==='human'){txt='Human';col='#6fa8dc';}
+  else if(st==='maybe'){txt='Maybe?';col='#e6b23c';}
+  else if(st==='idle'){txt='—';col='#8a8170';}
   else{txt='Not a cat';col='#e87a68';}
   o.fillStyle=col;o.font=`900 ${34*s}px Fraunces, serif`;
   o.fillText(txt, 96*s, 56*s);
@@ -302,6 +336,18 @@ function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,
 document.getElementById('freezeBtn').onclick=function(){frozen=!frozen;if(frozen){video.pause();}else{video.play();}this.textContent=frozen?'Unfreeze':'Freeze';};
 document.getElementById('flipBtn').onclick=()=>{facing=facing==='environment'?'user':'environment';if(running)initCam();};
 document.getElementById('shotBtn').onclick=saveShot;
+
+function setMode(m){
+  mode=m;
+  document.getElementById('modeCat').classList.toggle('primary',m==='cat');
+  document.getElementById('modeHC').classList.toggle('primary',m==='humancat');
+  document.getElementById('appTitle').textContent=(m==='humancat')?'Human or Cat?':'Is It a Cat?';
+  hits=[];
+  lastVerdict={state:(m==='humancat'?'idle':'no'),label:'',score:0,bbox:null};
+  setBadge(lastVerdict);
+}
+document.getElementById('modeCat').onclick=()=>setMode('cat');
+document.getElementById('modeHC').onclick=()=>setMode('humancat');
 </script>
 </body>
 </html>
