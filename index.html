@@ -218,16 +218,19 @@ function ingest(preds){
 function evaluate(){
   const t=performance.now();
   hits=hits.filter(h=>t-h.t<MEM);
-  let bestCat=null, bestDog=null, bestLike=null;
+  let bestCat=null, bestDog=null, bestLike=null, catStrong=0;
   for(const h of hits){
-    if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; }
+    if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; if(h.score>=0.50)catStrong++; }
     else if(h.class==='dog'){ if(!bestDog||h.score>bestDog.score)bestDog=h; }
     else if(!bestLike||h.score>bestLike.score)bestLike=h;
   }
   // a dog that scores as high as the cat means it's a dog, not a cat
   const dogBeatsCat = bestDog && (!bestCat || bestDog.score>=bestCat.score);
+  // green check requires a strong, repeated cat detection, not one lucky frame.
+  // kills flickery false positives (a pile of clothes that briefly reads as a cat).
+  const solidCat = bestCat && bestCat.score>=0.60 && catStrong>=3 && !dogBeatsCat;
   let v;
-  if(bestCat && bestCat.score>=0.50 && !dogBeatsCat){
+  if(solidCat){
     v={state:'yes',label:'CAT',score:bestCat.score,bbox:bestCat.bbox};
   }else if(dogBeatsCat && bestDog.score>=0.40){
     v={state:'no',label:"that's a dog",score:bestDog.score,bbox:bestDog.bbox};
