@@ -370,9 +370,10 @@ document.getElementById('modeHC').onclick=()=>setMode('humancat');
 const shopBtn=document.getElementById('shopBtn');
 shopBtn.href=TOYS_URL;
 
-// register service worker (required for an installable PWA / Play TWA)
+// service worker intentionally not registered: the TWA/Play build does not need it,
+// and it interferes with PWABuilder's analyzer. Any previously installed SW is cleared below.
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+  navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
 }
 </script>
 </body>
