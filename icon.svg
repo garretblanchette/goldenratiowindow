@@ -1,19 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0c0a08"/>
-  <g fill="none" stroke="#f0c14b" stroke-width="14" stroke-linecap="round">
-    <path d="M256 256 m0 0
-             a1 1 0 0 1 0 0" />
+  <rect width="512" height="512" fill="#0c0a08"/>
+  <g fill="#f0c14b">
+    <polygon points="148,158 210,262 104,244"/>
+    <polygon points="364,158 408,244 302,262"/>
+    <circle cx="256" cy="282" r="126"/>
   </g>
-  <!-- golden spiral -->
-  <path d="M 330 196
-           C 330 240, 296 274, 252 274
-           C 200 274, 158 232, 158 180
-           C 158 118, 208 68, 270 68
-           C 344 68, 404 128, 404 202
-           C 404 290, 332 362, 244 362
-           C 142 362, 60 280, 60 178"
-        fill="none" stroke="#f0c14b" stroke-width="16" stroke-linecap="round"/>
-  <!-- phi glyph -->
-  <text x="256" y="468" font-family="Georgia, serif" font-style="italic" font-weight="700"
-        font-size="120" fill="#d4a13a" text-anchor="middle">φ</text>
+  <g fill="#0c0a08">
+    <ellipse cx="210" cy="262" rx="15" ry="20"/>
+    <ellipse cx="302" cy="262" rx="15" ry="20"/>
+    <polygon points="256,300 242,314 270,314"/>
+  </g>
+  <g stroke="#0c0a08" stroke-width="6" stroke-linecap="round">
+    <line x1="248" y1="320" x2="172" y2="306"/>
+    <line x1="248" y1="326" x2="172" y2="334"/>
+    <line x1="264" y1="320" x2="340" y2="306"/>
+    <line x1="264" y1="326" x2="340" y2="334"/>
+  </g>
 </svg>

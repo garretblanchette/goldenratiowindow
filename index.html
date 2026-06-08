@@ -369,6 +369,11 @@ document.getElementById('modeHC').onclick=()=>setMode('humancat');
 // wire the cat-toys link
 const shopBtn=document.getElementById('shopBtn');
 shopBtn.href=TOYS_URL;
+
+// register service worker (required for an installable PWA / Play TWA)
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>

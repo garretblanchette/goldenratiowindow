@@ -1,13 +1,17 @@
 {
   "name": "Is It a Cat?",
   "short_name": "Cat?",
-  "description": "Point your camera at anything and find out if it's a cat.",
+  "description": "Point your camera at anything and find out if it's a cat. Toggle to Human or Cat mode.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0c0a08",
   "theme_color": "#0c0a08",
   "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }
