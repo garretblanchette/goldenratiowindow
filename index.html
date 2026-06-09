@@ -99,6 +99,7 @@
   <div class="btns" id="modes" style="gap:6px">
     <button id="modeCat" class="primary" style="min-width:0">Is it a cat?</button>
     <button id="modeBurger" style="min-width:0">Is it a burger?</button>
+    <button id="moreBtn" style="min-width:0;flex:0 0 auto" aria-label="more modes">•••</button>
     <button id="modeHC" class="hidden" style="min-width:0">Human or cat?</button>
     <button id="modeSkeptic" class="hidden" style="min-width:0">Skeptic detector</button>
   </div>
@@ -432,28 +433,12 @@ document.getElementById('modeHC').onclick=()=>setMode('humancat');
 document.getElementById('modeBurger').onclick=()=>setMode('burger');
 document.getElementById('modeSkeptic').onclick=()=>setMode('skeptic');
 
-// hidden modes: triple-tap the title to unlock human-or-cat and skeptic.
-let tapCount=0, tapTimer=null, unlocked=false;
-function revealHidden(){
-  if(unlocked)return;
-  unlocked=true;
+// tucked extra modes: the ••• button reveals human-or-cat and skeptic, then hides itself.
+document.getElementById('moreBtn').onclick=function(){
   document.getElementById('modeHC').classList.remove('hidden');
   document.getElementById('modeSkeptic').classList.remove('hidden');
-  // brief confirmation in the badge subtext without disturbing the verdict
-  const prev=sub.textContent;
-  sub.textContent='⋯ hidden modes unlocked';
-  setTimeout(()=>{ if(sub.textContent==='⋯ hidden modes unlocked') sub.textContent=prev; },1600);
-}
-const titleEl=document.getElementById('appTitle');
-titleEl.style.cursor='default';
-function bumpTap(){
-  tapCount++;
-  clearTimeout(tapTimer);
-  tapTimer=setTimeout(()=>{tapCount=0;},600);
-  if(tapCount>=3){tapCount=0;revealHidden();}
-}
-titleEl.addEventListener('click',bumpTap);
-titleEl.addEventListener('touchend',e=>{e.preventDefault();bumpTap();},{passive:false});
+  this.classList.add('hidden');
+};
 
 // wire the cat-toys link
 const shopBtn=document.getElementById('shopBtn');
