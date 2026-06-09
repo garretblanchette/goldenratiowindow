@@ -98,9 +98,9 @@
   <div class="title"><h1 id="appTitle">Is It a Cat?</h1><span>point &amp; find out</span></div>
   <div class="btns" id="modes" style="gap:6px">
     <button id="modeCat" class="primary" style="min-width:0">Is it a cat?</button>
-    <button id="modeHC" style="min-width:0">Human or cat?</button>
     <button id="modeBurger" style="min-width:0">Is it a burger?</button>
-    <button id="modeSkeptic" style="min-width:0">Skeptic detector</button>
+    <button id="modeHC" class="hidden" style="min-width:0">Human or cat?</button>
+    <button id="modeSkeptic" class="hidden" style="min-width:0">Skeptic detector</button>
   </div>
   <div class="btns" id="preBtns">
     <button class="primary" id="start">Start camera</button>
@@ -431,6 +431,29 @@ document.getElementById('modeCat').onclick=()=>setMode('cat');
 document.getElementById('modeHC').onclick=()=>setMode('humancat');
 document.getElementById('modeBurger').onclick=()=>setMode('burger');
 document.getElementById('modeSkeptic').onclick=()=>setMode('skeptic');
+
+// hidden modes: triple-tap the title to unlock human-or-cat and skeptic.
+let tapCount=0, tapTimer=null, unlocked=false;
+function revealHidden(){
+  if(unlocked)return;
+  unlocked=true;
+  document.getElementById('modeHC').classList.remove('hidden');
+  document.getElementById('modeSkeptic').classList.remove('hidden');
+  // brief confirmation in the badge subtext without disturbing the verdict
+  const prev=sub.textContent;
+  sub.textContent='⋯ hidden modes unlocked';
+  setTimeout(()=>{ if(sub.textContent==='⋯ hidden modes unlocked') sub.textContent=prev; },1600);
+}
+const titleEl=document.getElementById('appTitle');
+titleEl.style.cursor='default';
+function bumpTap(){
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer=setTimeout(()=>{tapCount=0;},600);
+  if(tapCount>=3){tapCount=0;revealHidden();}
+}
+titleEl.addEventListener('click',bumpTap);
+titleEl.addEventListener('touchend',e=>{e.preventDefault();bumpTap();},{passive:false});
 
 // wire the cat-toys link
 const shopBtn=document.getElementById('shopBtn');
