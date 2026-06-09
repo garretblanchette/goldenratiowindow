@@ -99,6 +99,8 @@
   <div class="btns" id="modes" style="gap:6px">
     <button id="modeCat" class="primary" style="min-width:0">Is it a cat?</button>
     <button id="modeHC" style="min-width:0">Human or cat?</button>
+    <button id="modeBurger" style="min-width:0">Is it a burger?</button>
+    <button id="modeSkeptic" style="min-width:0">Skeptic detector</button>
   </div>
   <div class="btns" id="preBtns">
     <button class="primary" id="start">Start camera</button>
@@ -125,6 +127,9 @@ const sub=document.getElementById('badgeSub');
 
 // classes that "kind of look like a cat" if no real cat is found
 const CATLIKE=new Set(['dog','teddy bear','bear','mouse','sheep','horse','cow']);
+// COCO-SSD has no "hamburger" class, so burger mode rides its real food classes.
+// at a burger restaurant the plate reliably trips one of these.
+const BURGERLIKE=new Set(['sandwich','hot dog','pizza','donut','cake','bowl']);
 
 let facing='environment',stream=null,model=null;
 let mode='cat'; // 'cat' or 'humancat'
@@ -230,7 +235,7 @@ async function detectLoop(){
 function ingest(preds){
   const t=performance.now();
   for(const p of preds){
-    if(p.class==='cat'||p.class==='person'||CATLIKE.has(p.class)) hits.push({class:p.class,score:p.score,bbox:p.bbox,t});
+    if(p.class==='cat'||p.class==='person'||CATLIKE.has(p.class)||BURGERLIKE.has(p.class)) hits.push({class:p.class,score:p.score,bbox:p.bbox,t});
   }
   hits=hits.filter(h=>t-h.t<MEM);
 }
@@ -239,6 +244,8 @@ function evaluate(){
   const t=performance.now();
   hits=hits.filter(h=>t-h.t<MEM);
   if(mode==='humancat'){evalHumanCat();return;}
+  if(mode==='burger'){evalBurger();return;}
+  if(mode==='skeptic'){evalSkeptic();return;}
   let bestCat=null, bestDog=null, bestLike=null, catStrong=0;
   for(const h of hits){
     if(h.class==='cat'){ if(!bestCat||h.score>bestCat.score)bestCat=h; if(h.score>=0.50)catStrong++; }
@@ -286,6 +293,45 @@ function evalHumanCat(){
   setBadge(v);
 }
 
+function evalBurger(){
+  // COCO has no hamburger; pool its food classes. "sandwich" is the strongest
+  // burger proxy, the rest count at a lower bar. require a repeated hit so a
+  // single lucky frame doesn't trigger.
+  let best=null, strong=0;
+  for(const h of hits){
+    if(BURGERLIKE.has(h.class)){
+      if(!best||h.score>best.score)best=h;
+      if(h.score>=0.45)strong++;
+    }
+  }
+  let v;
+  if(best && best.score>=0.55 && strong>=2){
+    v={state:'burger',label:'BURGER',score:best.score,bbox:best.bbox,via:best.class};
+  }else if(best && best.score>=0.30){
+    v={state:'maybeburger',label:'kinda burger-shaped',score:best.score,bbox:best.bbox,via:best.class};
+  }else{
+    v={state:'noburger',label:'NOT a burger',score:0,bbox:null};
+  }
+  lastVerdict=v;
+  setBadge(v);
+}
+
+function evalSkeptic(){
+  // pure face/person presence. any confident person is a skeptic.
+  let best=null;
+  for(const h of hits){
+    if(h.class==='person'){ if(!best||h.score>best.score)best=h; }
+  }
+  let v;
+  if(best && best.score>=0.45){
+    v={state:'skeptic',label:'SKEPTIC DETECTED',score:best.score,bbox:best.bbox};
+  }else{
+    v={state:'noskeptic',label:'no skeptics in frame',score:0,bbox:null};
+  }
+  lastVerdict=v;
+  setBadge(v);
+}
+
 function setBadge(v){
   let ic,txt,col,sb;
   if(v.state==='human'){ic='🧑';txt='Human';col='#6fa8dc';sb='that is a person  ·  '+Math.round(v.score*100)+'%';}
@@ -293,6 +339,11 @@ function setBadge(v){
   else if(v.state==='idle'){ic='❓';txt='—';col='var(--dim)';sb='point at a person or a cat';}
   else if(v.state==='yes'){ic='✅';txt='Cat';col='var(--green-bright)';sb='yep, that is a cat  ·  '+Math.round(v.score*100)+'%';}
   else if(v.state==='maybe'){ic='❓';txt='Maybe?';col='var(--amber)';sb=v.label+'  ·  '+Math.round(v.score*100)+'%';}
+  else if(v.state==='burger'){ic='🍔';txt='BURGER';col='var(--green-bright)';sb='confirmed burger  ·  '+Math.round(v.score*100)+'% (via '+v.via+')';}
+  else if(v.state==='maybeburger'){ic='❓';txt='Maybe?';col='var(--amber)';sb=v.label+'  ·  '+Math.round(v.score*100)+'%';}
+  else if(v.state==='noburger'){ic='❌';txt='Not a burger';col='var(--red-bright)';sb='no burger detected';}
+  else if(v.state==='skeptic'){ic='🧐';txt='SKEPTIC';col='var(--red-bright)';sb='this person doubts the app  ·  '+Math.round(v.score*100)+'%';}
+  else if(v.state==='noskeptic'){ic='👀';txt='—';col='var(--dim)';sb='no skeptics in frame';}
   else{ic='❌';txt='Not a cat';col='var(--red-bright)';sb=(v.label && v.label!=='NOT a cat')?v.label+'  ·  '+Math.round(v.score*100)+'%':'no cat detected';}
   icon.textContent=ic;
   verdict.textContent=txt;verdict.style.color=col;
@@ -308,9 +359,10 @@ function draw(){
   const b=lastVerdict.bbox;
   if(!b)return;
   let col;
-  if(lastVerdict.state==='yes'||lastVerdict.state==='catwin')col='#7fe0a0';
+  if(lastVerdict.state==='yes'||lastVerdict.state==='catwin'||lastVerdict.state==='burger')col='#7fe0a0';
   else if(lastVerdict.state==='human')col='#6fa8dc';
-  else if(lastVerdict.state==='maybe')col='#e6b23c';
+  else if(lastVerdict.state==='maybe'||lastVerdict.state==='maybeburger')col='#e6b23c';
+  else if(lastVerdict.state==='skeptic')col='#e87a68';
   else col='#e87a68';
   bctx.strokeStyle=col;bctx.lineWidth=Math.max(3,vw/220);
   bctx.strokeRect(b[0],b[1],b[2],b[3]);
@@ -327,12 +379,17 @@ function saveShot(){
   roundRect(o,20*s,20*s,300*s,96*s,16*s);o.fill();
   o.font=`${52*s}px serif`;o.textAlign='left';o.textBaseline='middle';
   const st=lastVerdict.state;
-  const ic=st==='yes'?'✅':st==='catwin'?'🐱':st==='human'?'🧑':st==='maybe'?'❓':st==='idle'?'❓':'❌';
+  const ic=st==='yes'?'✅':st==='catwin'?'🐱':st==='human'?'🧑':st==='burger'?'🍔':st==='skeptic'?'🧐':st==='maybe'?'❓':st==='maybeburger'?'❓':st==='idle'?'❓':st==='noskeptic'?'👀':'❌';
   o.fillText(ic, 34*s, 68*s);
   let txt,col;
   if(st==='yes'){txt='Cat';col='#7fe0a0';}
   else if(st==='catwin'){txt='Cat';col='#7fe0a0';}
   else if(st==='human'){txt='Human';col='#6fa8dc';}
+  else if(st==='burger'){txt='BURGER';col='#7fe0a0';}
+  else if(st==='maybeburger'){txt='Maybe?';col='#e6b23c';}
+  else if(st==='noburger'){txt='Not a burger';col='#e87a68';}
+  else if(st==='skeptic'){txt='SKEPTIC';col='#e87a68';}
+  else if(st==='noskeptic'){txt='—';col='#8a8170';}
   else if(st==='maybe'){txt='Maybe?';col='#e6b23c';}
   else if(st==='idle'){txt='—';col='#8a8170';}
   else{txt='Not a cat';col='#e87a68';}
@@ -361,13 +418,19 @@ function setMode(m){
   mode=m;
   document.getElementById('modeCat').classList.toggle('primary',m==='cat');
   document.getElementById('modeHC').classList.toggle('primary',m==='humancat');
-  document.getElementById('appTitle').textContent=(m==='humancat')?'Human or Cat?':'Is It a Cat?';
+  document.getElementById('modeBurger').classList.toggle('primary',m==='burger');
+  document.getElementById('modeSkeptic').classList.toggle('primary',m==='skeptic');
+  const titles={cat:'Is It a Cat?',humancat:'Human or Cat?',burger:'Is It a Burger?',skeptic:'Skeptic Detector'};
+  document.getElementById('appTitle').textContent=titles[m];
   hits=[];
-  lastVerdict={state:(m==='humancat'?'idle':'no'),label:'',score:0,bbox:null};
+  const idle={cat:{state:'no'},humancat:{state:'idle'},burger:{state:'noburger'},skeptic:{state:'noskeptic'}};
+  lastVerdict=Object.assign({label:'',score:0,bbox:null},idle[m]);
   setBadge(lastVerdict);
 }
 document.getElementById('modeCat').onclick=()=>setMode('cat');
 document.getElementById('modeHC').onclick=()=>setMode('humancat');
+document.getElementById('modeBurger').onclick=()=>setMode('burger');
+document.getElementById('modeSkeptic').onclick=()=>setMode('skeptic');
 
 // wire the cat-toys link
 const shopBtn=document.getElementById('shopBtn');
